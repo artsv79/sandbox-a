@@ -1,22 +1,17 @@
 package artsv.play.a;
 
-import static org.junit.jupiter.api.Assertions.*;
 import org.junit.jupiter.api.Test;
 
 import java.lang.reflect.Field;
 import java.util.Random;
 
-class StreamStatTest {
+import static org.junit.jupiter.api.Assertions.*;
+
+class StreamStatPreciseTest {
 
     @Test
     void testWithPrimeNumbers() {
-        Random rnd = new Random();
-        StreamStat tested = new StreamStat();
-        double sum = 0;
-        double min = Double.MAX_VALUE, max = Double.MIN_VALUE;
-        int i;
-        int count = 0;
-
+        StreamStatPrecise tested = new StreamStatPrecise();
         tested.putNext(700);
         tested.putNext(900);
         tested.putNext(1100);
@@ -33,55 +28,53 @@ class StreamStatTest {
         tested.putNext(5300);
         tested.putNext(5900);
         tested.putNext(6100);
-        assertEquals(3125, tested.getAvg1());
+        assertEquals(3125, tested.getAvg());
     }
 
     @Test
     void testMin() {
-        assertTrue(Double.isNaN(new StreamStat().getMin()));
+        assertTrue(Double.isNaN(new StreamStatPrecise().getMin()));
     }
 
     @Test
     void testMax() {
-        assertTrue(Double.isNaN(new StreamStat().getMax()));
+        assertTrue(Double.isNaN(new StreamStatPrecise().getMax()));
     }
 
     @Test
     void testAvg() {
-        assertTrue(Double.isNaN(new StreamStat().getAvg1()));
+        assertTrue(Double.isNaN(new StreamStatPrecise().getAvg()));
     }
 
     @Test
     void testSimple() {
-        StreamStat shtuka = new StreamStat();
+        StreamStatPrecise shtuka = new StreamStatPrecise();
         shtuka.putNext(0);
         assertEquals(0, shtuka.getMax());
         assertEquals(0, shtuka.getMin());
-        assertEquals(0, shtuka.getAvg1());
+        assertEquals(0, shtuka.getAvg());
         shtuka.putNext(Double.NaN);
         assertEquals(0, shtuka.getMax());
         assertEquals(0, shtuka.getMin());
-        assertEquals(0, shtuka.getAvg1());
+        assertEquals(0, shtuka.getAvg());
         shtuka.putNext(-10);
         assertEquals(0, shtuka.getMax());
         assertEquals(-10, shtuka.getMin());
-        assertEquals(-5, shtuka.getAvg1());
+        assertEquals(-5, shtuka.getAvg());
         assertEquals(2, shtuka.getCount());
     }
 
     @Test
     void testSeries() {
-        StreamStat shtuka = new StreamStat();
-        int N = 100_000_000;
+        StreamStatPrecise shtuka = new StreamStatPrecise();
+        int N = 100_000;
         double min = 0, max = 0;
         double sum = 0;
-//        BigDecimal bSum = new BigDecimal(0);
         Random rnd = new Random();
         for (int i = 0; i < N; i++) {
             double x = rnd.nextInt();
             shtuka.putNext(x);
             sum += x;
-//            bSum = bSum.add(new BigDecimal(x));
             if (i == 0) {
                 min = max = x;
             } else {
@@ -90,16 +83,16 @@ class StreamStatTest {
             }
         }
         System.out.println(sum);
-        double avg = sum / (double)N;
+        double expectedAvg = sum / (double)N;
         assertEquals(N, shtuka.getCount());
         assertEquals(min, shtuka.getMin());
         assertEquals(max, shtuka.getMax());
-        assertEquals(avg, shtuka.getAvg1());
+        assertEquals(expectedAvg, shtuka.getAvg());
     }
 
     @Test
     void testHackWithMaxValueOfN() {
-        StreamStat shtuka = new StreamStat();
+        StreamStatPrecise shtuka = new StreamStatPrecise();
         shtuka.putNext(1);
         try {
             Field n = shtuka.getClass().getDeclaredField("n");
@@ -111,9 +104,7 @@ class StreamStatTest {
             assertTrue(false);
         }
 
-        shtuka.putNext(Long.MAX_VALUE);
-        assertEquals(2, shtuka.getAvg2());
-        assertEquals(1, shtuka.getAvg1());
+        shtuka.putNext(1);
         assertEquals(Long.MAX_VALUE, shtuka.getCount());
 
 
@@ -123,8 +114,41 @@ class StreamStatTest {
         } catch (ArithmeticException e) {
             // expected
         }
-        assertEquals(2, shtuka.getAvg2()); // getAvg2() method is resistant agains 'set n to arbitrary value via reflection' attack
-        assertEquals(1, shtuka.getAvg1()); // getAvg1() mathod can be hacked by modifying n via reflection
         assertEquals(Long.MAX_VALUE, shtuka.getCount());
+    }
+
+    @Test
+    void testOverflow() {
+        int N = 10_000_0000;
+        StreamStatPrecise shtuka = new StreamStatPrecise();
+        for (int i = 0; i <= N; i++) {
+            double elem = i*(Double.MAX_VALUE/N);
+            shtuka.putNext(elem);
+        }
+        assertNotEquals(Double.MAX_VALUE, shtuka.getAvg());
+        assertEquals(Double.MAX_VALUE/2.0, shtuka.getAvg());
+    }
+
+    @Test
+    void testOverflow2() {
+        int N = 100_000_000;
+        StreamStatPrecise shtuka = new StreamStatPrecise();
+        for (int i = 0; i < N; i++) {
+            shtuka.putNext(Double.MAX_VALUE - i);
+            shtuka.putNext(-Double.MAX_VALUE + i);
+        }
+        assertEquals(0.0, shtuka.getAvg());
+    }
+
+    @Test
+    void testBigPlusSmall() {
+        int N = 100_000_000;
+        StreamStatPrecise shtuka = new StreamStatPrecise();
+        for (int i = 0; i < N; i++) {
+            shtuka.putNext(Double.MAX_VALUE - i);
+            shtuka.putNext(i);
+        }
+        assertNotEquals(Double.MAX_VALUE, shtuka.getAvg());
+        assertEquals(Double.MAX_VALUE/2, shtuka.getAvg());
     }
 }
